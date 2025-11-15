@@ -42,21 +42,9 @@ class CardParser:
         if image.mode != 'RGB':
             image = image.convert('RGB')
 
-        # Увеличиваем изображение для лучшего распознавания
+        # Увеличиваем изображение в 2 раза
         width, height = image.size
-        scale_factor = 3  # Увеличиваем в 3 раза для лучшего качества
-        image = image.resize((width * scale_factor, height * scale_factor), Image.Resampling.LANCZOS)
-
-        # Увеличиваем контрастность
-        enhancer = ImageEnhance.Contrast(image)
-        image = enhancer.enhance(2.0)
-
-        # Увеличиваем резкость
-        enhancer = ImageEnhance.Sharpness(image)
-        image = enhancer.enhance(2.0)
-
-        # Применяем фильтр для улучшения четкости
-        image = image.filter(ImageFilter.SHARPEN)
+        image = image.resize((width * 2, height * 2), Image.Resampling.LANCZOS)
 
         return image
 
@@ -73,28 +61,12 @@ class CardParser:
         """
         image = CardParser.preprocess_image(image_bytes)
 
-        # Пробуем несколько конфигураций Tesseract
-        configs = [
-            r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789/-',
-            r'--oem 3 --psm 11 -c tessedit_char_whitelist=0123456789/-',
-            r'--oem 3 --psm 12 -c tessedit_char_whitelist=0123456789/-',
-        ]
+        # Простая конфигурация Tesseract - только цифры и разделители
+        custom_config = r'--oem 3 --psm 6'
+        text = pytesseract.image_to_string(image, config=custom_config, lang='eng')
 
-        all_text = []
-        for config in configs:
-            try:
-                text = pytesseract.image_to_string(image, config=config, lang='eng')
-                all_text.append(text)
-                logger.debug(f"OCR с конфигом {config}: {text}")
-            except Exception as e:
-                logger.error(f"Ошибка OCR с конфигом {config}: {e}")
-                continue
-
-        # Объединяем весь распознанный текст
-        combined_text = '\n'.join(all_text)
-        logger.info(f"Распознанный текст: {combined_text}")
-
-        return combined_text
+        logger.info(f"Распознанный текст: {text}")
+        return text
 
     @staticmethod
     def parse_card_number(text: str) -> str:
