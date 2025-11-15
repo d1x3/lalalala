@@ -2,9 +2,15 @@
 Модуль для OCR и парсинга данных банковских карт
 """
 import re
+import platform
 from PIL import Image
 import pytesseract
 from io import BytesIO
+
+# Автоматическая настройка пути к Tesseract для Windows
+if platform.system() == 'Windows':
+    # Стандартный путь установки Tesseract на Windows
+    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 
 class CardParser:
