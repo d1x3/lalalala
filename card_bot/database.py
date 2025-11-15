@@ -93,6 +93,32 @@ class SecureCardDatabase:
             cursor.execute('SELECT id, card_name, created_at FROM cards ORDER BY id')
             return cursor.fetchall()
 
+    def card_exists(self, card_number: str) -> bool:
+        """
+        Проверяет, существует ли карта с таким номером
+
+        Args:
+            card_number: номер карты для проверки
+
+        Returns:
+            True если карта уже есть в БД
+        """
+        # Убираем пробелы из номера для сравнения
+        clean_number = card_number.replace(' ', '')
+
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT encrypted_data FROM cards')
+            all_cards = cursor.fetchall()
+
+            for (encrypted_data,) in all_cards:
+                card_data = self._decrypt_data(encrypted_data)
+                stored_number = card_data.get('card_number', '').replace(' ', '')
+                if stored_number == clean_number:
+                    return True
+
+        return False
+
     def get_card(self, card_id: int):
         """
         Получает данные карты по ID

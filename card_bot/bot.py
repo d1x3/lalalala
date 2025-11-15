@@ -241,61 +241,89 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Скачиваем фото
         image_bytes = await file.download_as_bytearray()
 
-        # Парсим данные карты
-        card_data = parser.parse_card_from_image(bytes(image_bytes))
+        # Парсим ВСЕ карты с изображения
+        all_cards = parser.parse_all_cards_from_image(bytes(image_bytes))
 
-        card_number = card_data.get('card_number')
-        cvv = card_data.get('cvv')
-        expiry = card_data.get('expiry')
-
-        # Проверяем, что удалось распознать данные
-        if not card_number:
+        # Проверяем, что удалось распознать хотя бы одну карту
+        if not all_cards:
             await processing_msg.edit_text(
                 "❌ Не удалось распознать номер карты.\n\n"
                 "💡 Попробуйте:\n"
                 "- Сделать более четкое фото\n"
                 "- Убедиться, что все цифры видны\n"
-                "- Улучшить освещение"
+                "- Улучшить освещение\n"
+                "- Отправить фото с белым фоном"
             )
             return
 
-        # Валидация номера карты по алгоритму Луна
-        if not parser.validate_card_number(card_number):
-            await processing_msg.edit_text(
-                f"⚠️ Распознан номер карты: `{card_number}`\n"
-                "Но он не прошел проверку по алгоритму Луна.\n\n"
-                "Возможно, произошла ошибка распознавания. "
-                "Проверьте данные перед использованием.",
+        # Если найдено больше одной карты
+        if len(all_cards) > 1:
+            await processing_msg.edit_text(f"🎉 Найдено карт: {len(all_cards)}\nОбрабатываю каждую...")
+
+        # Обрабатываем каждую найденную карту
+        saved_count = 0
+        duplicate_count = 0
+
+        for idx, card_data in enumerate(all_cards, 1):
+            card_number = card_data.get('card_number')
+            cvv = card_data.get('cvv')
+            expiry = card_data.get('expiry')
+
+            if not card_number:
+                continue
+
+            # Проверка на дубликат
+            if db.card_exists(card_number):
+                duplicate_count += 1
+                result_text = f"⚠️ **Карта {idx}/{len(all_cards)}**\n\n"
+                result_text += f"💳 Номер: `{card_number}`\n\n"
+                result_text += "❌ **Эта карта уже есть в базе данных!**"
+                await update.message.reply_text(result_text, parse_mode='Markdown')
+                continue
+
+            # Валидация номера карты по алгоритму Луна
+            is_valid = parser.validate_card_number(card_number)
+
+            # Показываем распознанные данные
+            result_text = f"✅ **Карта {idx}/{len(all_cards)} распознана:**\n\n"
+            result_text += f"💳 Номер карты: `{card_number}`\n"
+            result_text += f"🔐 CVV: `{cvv or 'Не найден'}`\n"
+            result_text += f"📅 Срок: `{expiry or 'Не найден'}`\n\n"
+
+            if not is_valid:
+                result_text += "⚠️ Номер не прошел проверку по алгоритму Луна\n"
+
+            # Если не все данные распознаны
+            if not cvv or not expiry:
+                result_text += "⚠️ Не все данные распознаны\n\n"
+
+            result_text += "Сохранить эту карту?"
+
+            # Кнопки для сохранения
+            keyboard = [
+                [
+                    InlineKeyboardButton("✅ Сохранить", callback_data=f"save_{card_number}_{cvv}_{expiry}"),
+                    InlineKeyboardButton("❌ Пропустить", callback_data="cancel")
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            await update.message.reply_text(
+                result_text,
+                reply_markup=reply_markup,
                 parse_mode='Markdown'
             )
 
-        # Показываем распознанные данные
-        result_text = "✅ **Данные распознаны:**\n\n"
-        result_text += f"💳 Номер карты: `{card_number or 'Не найден'}`\n"
-        result_text += f"🔐 CVV: `{cvv or 'Не найден'}`\n"
-        result_text += f"📅 Срок: `{expiry or 'Не найден'}`\n\n"
+        # Удаляем сообщение об обработке
+        await processing_msg.delete()
 
-        # Если не все данные распознаны
-        if not cvv or not expiry:
-            result_text += "⚠️ Не все данные распознаны.\n"
-            result_text += "Вы можете добавить их вручную командой /add\n\n"
-
-        result_text += "Сохранить эту карту?"
-
-        # Кнопки для сохранения
-        keyboard = [
-            [
-                InlineKeyboardButton("✅ Сохранить", callback_data=f"save_{card_number}_{cvv}_{expiry}"),
-                InlineKeyboardButton("❌ Отмена", callback_data="cancel")
-            ]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        await processing_msg.edit_text(
-            result_text,
-            reply_markup=reply_markup,
-            parse_mode='Markdown'
-        )
+        # Итоговое сообщение
+        if len(all_cards) > 1 or duplicate_count > 0:
+            summary = f"📊 **Итого:**\n"
+            summary += f"Найдено карт: {len(all_cards)}\n"
+            if duplicate_count > 0:
+                summary += f"Дубликатов: {duplicate_count}\n"
+            await update.message.reply_text(summary, parse_mode='Markdown')
 
     except Exception as e:
         logger.error(f"Ошибка обработки фото: {e}")
@@ -329,6 +357,17 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             card_number = parts[1]
             cvv = parts[2] if parts[2] != 'None' else None
             expiry = parts[3] if parts[3] != 'None' else None
+
+            # Проверка на дубликат
+            if db.card_exists(card_number):
+                await query.edit_message_text(
+                    f"⚠️ **Карта уже существует!**\n\n"
+                    f"💳 Номер: `{card_number}`\n\n"
+                    f"❌ Эта карта уже есть в базе данных.\n"
+                    f"Используйте /list для просмотра.",
+                    parse_mode='Markdown'
+                )
+                return
 
             # Сохраняем в БД
             card_id = db.add_card(
@@ -460,6 +499,17 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     expiry = parser.parse_expiry(text)
 
     if card_number:
+        # Проверка на дубликат
+        if db.card_exists(card_number):
+            await update.message.reply_text(
+                f"⚠️ **Карта уже существует!**\n\n"
+                f"💳 Номер: `{card_number}`\n\n"
+                f"❌ Эта карта уже есть в базе данных.\n"
+                f"Используйте /list для просмотра.",
+                parse_mode='Markdown'
+            )
+            return
+
         # Сохраняем карту
         card_id = db.add_card(
             card_number=card_number,

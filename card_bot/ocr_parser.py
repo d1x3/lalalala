@@ -3,9 +3,13 @@
 """
 import re
 import platform
-from PIL import Image
+import logging
+from PIL import Image, ImageEnhance, ImageFilter
 import pytesseract
 from io import BytesIO
+
+# Логирование
+logger = logging.getLogger(__name__)
 
 # Автоматическая настройка пути к Tesseract для Windows
 if platform.system() == 'Windows':
@@ -38,10 +42,21 @@ class CardParser:
         if image.mode != 'RGB':
             image = image.convert('RGB')
 
-        # Увеличиваем контраст и размер для лучшего распознавания
-        # Увеличиваем изображение в 2 раза
+        # Увеличиваем изображение для лучшего распознавания
         width, height = image.size
-        image = image.resize((width * 2, height * 2), Image.Resampling.LANCZOS)
+        scale_factor = 3  # Увеличиваем в 3 раза для лучшего качества
+        image = image.resize((width * scale_factor, height * scale_factor), Image.Resampling.LANCZOS)
+
+        # Увеличиваем контрастность
+        enhancer = ImageEnhance.Contrast(image)
+        image = enhancer.enhance(2.0)
+
+        # Увеличиваем резкость
+        enhancer = ImageEnhance.Sharpness(image)
+        image = enhancer.enhance(2.0)
+
+        # Применяем фильтр для улучшения четкости
+        image = image.filter(ImageFilter.SHARPEN)
 
         return image
 
@@ -58,13 +73,28 @@ class CardParser:
         """
         image = CardParser.preprocess_image(image_bytes)
 
-        # Tesseract OCR с параметрами для цифр
-        # --psm 6: предполагаем единый блок текста
-        # -c tessedit_char_whitelist: разрешаем только нужные символы
-        custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789/-'
-        text = pytesseract.image_to_string(image, config=custom_config, lang='eng')
+        # Пробуем несколько конфигураций Tesseract
+        configs = [
+            r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789/-',
+            r'--oem 3 --psm 11 -c tessedit_char_whitelist=0123456789/-',
+            r'--oem 3 --psm 12 -c tessedit_char_whitelist=0123456789/-',
+        ]
 
-        return text
+        all_text = []
+        for config in configs:
+            try:
+                text = pytesseract.image_to_string(image, config=config, lang='eng')
+                all_text.append(text)
+                logger.debug(f"OCR с конфигом {config}: {text}")
+            except Exception as e:
+                logger.error(f"Ошибка OCR с конфигом {config}: {e}")
+                continue
+
+        # Объединяем весь распознанный текст
+        combined_text = '\n'.join(all_text)
+        logger.info(f"Распознанный текст: {combined_text}")
+
+        return combined_text
 
     @staticmethod
     def parse_card_number(text: str) -> str:
@@ -94,6 +124,33 @@ class CardParser:
             return re.sub(r'[\s\-]', '', matches[0])
 
         return None
+
+    @staticmethod
+    def parse_all_card_numbers(text: str) -> list:
+        """
+        Извлекает ВСЕ номера карт из текста (для нескольких карт на одном фото)
+
+        Args:
+            text: текст для парсинга
+
+        Returns:
+            список номеров карт
+        """
+        # Удаляем все пробелы и дефисы для поиска
+        clean_text = re.sub(r'[\s\-]', '', text)
+
+        # Ищем все последовательности из 16 цифр
+        matches = re.findall(r'\d{16}', clean_text)
+
+        if matches:
+            # Форматируем каждый номер с пробелами
+            formatted = []
+            for card_number in matches:
+                formatted_number = f"{card_number[0:4]} {card_number[4:8]} {card_number[8:12]} {card_number[12:16]}"
+                formatted.append(formatted_number)
+            return formatted
+
+        return []
 
     @staticmethod
     def parse_expiry(text: str) -> str:
@@ -167,6 +224,41 @@ class CardParser:
             'expiry': expiry,
             'raw_text': text  # для отладки
         }
+
+    @classmethod
+    def parse_all_cards_from_image(cls, image_bytes: bytes) -> list:
+        """
+        Парсит ВСЕ карты с одного изображения
+
+        Args:
+            image_bytes: байты изображения
+
+        Returns:
+            список словарей с данными карт
+        """
+        # Извлекаем текст
+        text = cls.extract_text_from_image(image_bytes)
+
+        # Парсим все номера карт
+        card_numbers = cls.parse_all_card_numbers(text)
+
+        if not card_numbers:
+            return []
+
+        # Для каждого номера карты пытаемся найти CVV и срок
+        cards = []
+        for card_number in card_numbers:
+            expiry = cls.parse_expiry(text)
+            cvv = cls.parse_cvv(text, card_number)
+
+            cards.append({
+                'card_number': card_number,
+                'cvv': cvv,
+                'expiry': expiry
+            })
+
+        logger.info(f"Найдено карт: {len(cards)}")
+        return cards
 
     @staticmethod
     def format_card_number(card_number: str) -> str:
