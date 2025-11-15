@@ -59,6 +59,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /add - Добавить карту (отправьте скриншот)
 /list - Показать список карт
 /excel - Экспортировать все карты в Excel
+/clear - Удалить все карты
 /help - Помощь
 
 **Как использовать:**
@@ -85,6 +86,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /add - Добавить карту вручную
 /list - Показать все карты
 /excel - Экспортировать в Excel файл
+/clear - Удалить все карты (с подтверждением)
 /help - Эта справка
 
 **Отправка скриншота:**
@@ -223,6 +225,40 @@ async def export_to_excel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
+async def clear_all_cards(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Удаляет все карты из базы данных (с подтверждением)"""
+    user_id = update.effective_user.id
+    if not check_user_access(user_id):
+        await update.message.reply_text("⛔ У вас нет доступа к этому боту.")
+        return
+
+    cards = db.get_all_cards()
+
+    if not cards:
+        await update.message.reply_text("📭 У вас пока нет сохраненных карт.")
+        return
+
+    # Показываем предупреждение с кнопками подтверждения
+    warning_text = f"⚠️ **ВНИМАНИЕ!**\n\n"
+    warning_text += f"Вы собираетесь удалить **ВСЕ {len(cards)} карт(ы)** из базы данных.\n\n"
+    warning_text += "❌ **Это действие нельзя отменить!**\n\n"
+    warning_text += "Вы уверены?"
+
+    keyboard = [
+        [
+            InlineKeyboardButton("✅ Да, удалить все", callback_data="confirm_clear_all"),
+            InlineKeyboardButton("❌ Отмена", callback_data="cancel")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        warning_text,
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
+
+
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обрабатывает отправленное фото карты"""
     user_id = update.effective_user.id
@@ -353,6 +389,16 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Отмена
     if data == "cancel":
         await query.edit_message_text("❌ Операция отменена.")
+        return
+
+    # Подтверждение удаления всех карт
+    if data == "confirm_clear_all":
+        count = db.clear_all_cards()
+        await query.edit_message_text(
+            f"✅ **Все карты удалены!**\n\n"
+            f"Удалено карт: {count}\n\n"
+            f"База данных очищена."
+        )
         return
 
     # Сохранение карты
@@ -548,6 +594,7 @@ def main():
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("list", list_cards))
     application.add_handler(CommandHandler("excel", export_to_excel))
+    application.add_handler(CommandHandler("clear", clear_all_cards))
     application.add_handler(CommandHandler("add", add_card_manual))
 
     # Обработчики сообщений

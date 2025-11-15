@@ -173,3 +173,18 @@ class SecureCardDatabase:
             )
             conn.commit()
             return cursor.rowcount > 0
+
+    def clear_all_cards(self) -> int:
+        """
+        Удаляет все карты из базы данных
+
+        Returns:
+            количество удаленных карт
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT COUNT(*) FROM cards')
+            count = cursor.fetchone()[0]
+            cursor.execute('DELETE FROM cards')
+            conn.commit()
+            return count
