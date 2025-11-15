@@ -3,6 +3,7 @@ Telegram бот для безопасного хранения данных ба
 """
 import os
 import logging
+from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -12,6 +13,8 @@ from telegram.ext import (
     ContextTypes,
     filters
 )
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment
 from database import SecureCardDatabase
 from ocr_parser import CardParser
 
@@ -28,8 +31,8 @@ ALLOWED_USER_ID = os.getenv('ALLOWED_USER_ID', None)  # ID пользовате�
 
 # Инициализация БД
 db = SecureCardDatabase(
-    db_path='card_bot/cards.db',
-    key_path='card_bot/.encryption_key'
+    db_path='cards.db',
+    key_path='.encryption_key'
 )
 parser = CardParser()
 
@@ -55,12 +58,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 **Доступные команды:**
 /add - Добавить карту (отправьте скриншот)
 /list - Показать список карт
+/excel - Экспортировать все карты в Excel
 /help - Помощь
 
 **Как использовать:**
 1. Отправьте скриншот банковской карты
 2. Бот автоматически распознает и сохранит данные
 3. Используйте /list для просмотра карт
+4. Используйте /excel для скачивания всех карт
 
 ⚠️ **Безопасность:**
 - Все данные шифруются локально
@@ -79,7 +84,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /start - Начало работы
 /add - Добавить карту вручную
 /list - Показать все карты
-/delete - Удалить карту
+/excel - Экспортировать в Excel файл
 /help - Эта справка
 
 **Отправка скриншота:**
@@ -88,10 +93,14 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 - Найдет CVV код (3-4 цифры)
 - Определит срок действия (MM/YY)
 
+**Экспорт данных:**
+- /excel - скачать красивый Excel файл с таблицей всех карт
+
 **Советы:**
 - Делайте четкие фото при хорошем освещении
 - Убедитесь, что все цифры видны
 - После сохранения проверьте данные
+- Удаляйте экспортированные файлы после использования
     """
     await update.message.reply_text(help_text, parse_mode='Markdown')
 
@@ -123,6 +132,95 @@ async def list_cards(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
+
+
+async def export_to_excel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Экспортирует все карты в Excel файл"""
+    user_id = update.effective_user.id
+    if not check_user_access(user_id):
+        await update.message.reply_text("⛔ У вас нет доступа к этому боту.")
+        return
+
+    cards = db.get_all_cards()
+
+    if not cards:
+        await update.message.reply_text("📭 У вас пока нет сохраненных карт.")
+        return
+
+    processing_msg = await update.message.reply_text("📊 Создаю Excel файл...")
+
+    try:
+        # Создаем Excel файл
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Мои карты"
+
+        # Заголовки
+        headers = ["ID", "Название", "Номер карты", "CVV", "Срок действия", "Дата добавления"]
+        ws.append(headers)
+
+        # Стилизация заголовков
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        header_font = Font(color="FFFFFF", bold=True, size=12)
+
+        for cell in ws[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+
+        # Добавляем данные карт
+        for card_id, card_name, created_at in cards:
+            card_data = db.get_card(card_id)
+            if card_data:
+                ws.append([
+                    card_id,
+                    card_name if card_name else f"Карта #{card_id}",
+                    card_data['card_number'],
+                    card_data['cvv'],
+                    card_data['expiry'],
+                    created_at
+                ])
+
+        # Настройка ширины столбцов
+        ws.column_dimensions['A'].width = 8
+        ws.column_dimensions['B'].width = 20
+        ws.column_dimensions['C'].width = 22
+        ws.column_dimensions['D'].width = 10
+        ws.column_dimensions['E'].width = 15
+        ws.column_dimensions['F'].width = 20
+
+        # Выравнивание данных
+        for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+            for cell in row:
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+
+        # Сохраняем файл
+        filename = f"my_cards_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        wb.save(filename)
+
+        # Отправляем файл пользователю
+        with open(filename, 'rb') as f:
+            await update.message.reply_document(
+                document=f,
+                filename="my_cards.xlsx",
+                caption="📊 **Ваши карты в Excel файле**\n\n"
+                       "⚠️ **ВАЖНО:**\n"
+                       "- Удалите файл после использования!\n"
+                       "- Не храните его в открытом виде\n"
+                       "- Не отправляйте никому"
+            )
+
+        # Удаляем временный файл
+        os.remove(filename)
+
+        await processing_msg.delete()
+
+    except Exception as e:
+        logger.error(f"Ошибка при создании Excel: {e}")
+        await processing_msg.edit_text(
+            f"❌ Ошибка при создании Excel файла:\n`{str(e)}`",
+            parse_mode='Markdown'
+        )
 
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -394,6 +492,7 @@ def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("list", list_cards))
+    application.add_handler(CommandHandler("excel", export_to_excel))
     application.add_handler(CommandHandler("add", add_card_manual))
 
     # Обработчики сообщений

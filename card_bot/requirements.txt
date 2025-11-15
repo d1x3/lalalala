@@ -2,3 +2,4 @@ python-telegram-bot==20.7
 pytesseract==0.3.10
 Pillow==10.1.0
 cryptography==41.0.7
+openpyxl==3.1.2
