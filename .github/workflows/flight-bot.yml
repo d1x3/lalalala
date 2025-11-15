@@ -52,6 +52,7 @@ jobs:
         name: flight-bot-logs
         path: cheap_flights_bot.log
         retention-days: 7
+        if-no-files-found: ignore
 
     - name: Save found flights history
       if: always()
@@ -60,3 +61,4 @@ jobs:
         name: found-flights
         path: found_flights.json
         retention-days: 30
+        if-no-files-found: ignore
