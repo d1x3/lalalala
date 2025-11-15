@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  flight-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.flightbot
+    container_name: cheap-flights-bot
+    restart: unless-stopped
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-8080110045:AAGK01_8PByIWA-F9o4wJnlGRdQtWu89Uyo}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+    volumes:
+      # Сохраняем историю найденных билетов и логи
+      - ./found_flights.json:/app/found_flights.json
+      - ./cheap_flights_bot.log:/app/cheap_flights_bot.log
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

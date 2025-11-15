@@ -1,0 +1,28 @@
+# Dockerfile для бота поиска дешевых авиабилетов
+FROM python:3.9-slim
+
+# Устанавливаем рабочую директорию
+WORKDIR /app
+
+# Копируем файл зависимостей
+COPY requirements_flight_bot.txt .
+
+# Устанавливаем зависимости
+RUN pip install --no-cache-dir -r requirements_flight_bot.txt
+
+# Копируем файлы бота
+COPY cheap_flights_bot.py .
+COPY flight_finder.py .
+COPY telegram_notifier.py .
+COPY flight_config.py .
+
+# Создаем пользователя для запуска бота (безопасность)
+RUN useradd -m -u 1000 botuser && chown -R botuser:botuser /app
+USER botuser
+
+# Устанавливаем переменные окружения (можно переопределить при запуске)
+ENV TELEGRAM_BOT_TOKEN=""
+ENV TELEGRAM_CHAT_ID=""
+
+# Команда запуска
+CMD ["python", "cheap_flights_bot.py"]

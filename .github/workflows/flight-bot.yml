@@ -1,0 +1,62 @@
+name: Cheap Flights Bot
+
+# Запуск каждый час
+on:
+  schedule:
+    # Каждый час (можно изменить на нужное расписание)
+    - cron: '0 * * * *'
+
+  # Также можно запустить вручную
+  workflow_dispatch:
+
+jobs:
+  search-flights:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        ref: claude/cheap-flights-moscow-ufa-019sn6X5EcQrtysQxyofq1eg
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests python-dateutil
+
+    - name: Run flight search
+      env:
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      run: |
+        # Обновляем flight_config.py с токенами из secrets
+        if [ ! -z "$TELEGRAM_BOT_TOKEN" ]; then
+          sed -i "s/TELEGRAM_BOT_TOKEN = .*/TELEGRAM_BOT_TOKEN = \"$TELEGRAM_BOT_TOKEN\"/" flight_config.py
+        fi
+        if [ ! -z "$TELEGRAM_CHAT_ID" ]; then
+          sed -i "s/TELEGRAM_CHAT_ID = .*/TELEGRAM_CHAT_ID = \"$TELEGRAM_CHAT_ID\"/" flight_config.py
+        fi
+
+        # Запускаем бота в режиме однократного поиска
+        python cheap_flights_bot.py --once
+
+    - name: Upload logs
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: flight-bot-logs
+        path: cheap_flights_bot.log
+        retention-days: 7
+
+    - name: Save found flights history
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: found-flights
+        path: found_flights.json
+        retention-days: 30

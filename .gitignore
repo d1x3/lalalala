@@ -161,3 +161,8 @@ cython_debug/
 
 # ignoring .git folder
 .git/
+
+# Flight bot specific files
+found_flights.json
+cheap_flights_bot.log
+cron.log
