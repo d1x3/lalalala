@@ -66,7 +66,8 @@ class FlightFinder:
             'currency': 'rub',
             'limit': 30,
             'page': 1,
-            'sorting': 'price'
+            'sorting': 'price',
+            'token': config.AVIASALES_API_TOKEN
         }
 
         try:

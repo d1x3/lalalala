@@ -6,6 +6,9 @@
 TELEGRAM_BOT_TOKEN = "8080110045:AAGK01_8PByIWA-F9o4wJnlGRdQtWu89Uyo"
 TELEGRAM_CHAT_ID = None  # Будет заполнено автоматически при первом запуске
 
+# Aviasales API настройки
+AVIASALES_API_TOKEN = "d466c02eb95b443bda5583c851f210ce"
+
 # Настройки поиска билетов
 ORIGIN_CITY = "MOW"  # Москва (код IATA)
 DESTINATION_CITY = "UFA"  # Уфа (код IATA)
