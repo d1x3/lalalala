@@ -297,6 +297,11 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not cvv or not expiry:
                 result_text += "⚠️ Не все данные распознаны\n\n"
 
+            result_text += "⚠️ **Проверьте CVV код!** OCR может ошибаться.\n\n"
+            result_text += "Если CVV неправильный:\n"
+            result_text += "1. Нажмите 'Пропустить'\n"
+            result_text += "2. Введите данные вручную:\n"
+            result_text += f"`{card_number} ВАШ_CVV {expiry or 'MM/YY'}`\n\n"
             result_text += "Сохранить эту карту?"
 
             # Кнопки для сохранения
