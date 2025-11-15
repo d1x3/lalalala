@@ -1,10 +1,11 @@
 name: Build a container image of Exorde CLI
 
+# Workflow отключен - не используется для бота поиска билетов
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
+  # push:
+  #   branches:
+  #     - main
 
 jobs:
   build-deploy:
