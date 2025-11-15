@@ -22,7 +22,7 @@ class CardParser:
 
     # Паттерны для поиска данных карты
     CARD_NUMBER_PATTERN = r'\b(\d{4}[\s\-]?\d{4}[\s\-]?\d{4}[\s\-]?\d{4})\b'
-    CVV_PATTERN = r'\b(\d{3,4})\b'
+    CVV_PATTERN = r'\b(\d{3})\b'  # Только 3 цифры
     EXPIRY_PATTERN = r'\b(0[1-9]|1[0-2])[/\-\s]?(\d{2})\b'
 
     @staticmethod
@@ -146,28 +146,36 @@ class CardParser:
     @staticmethod
     def parse_cvv(text: str, card_number: str = None) -> str:
         """
-        Извлекает CVV код из текста
+        Извлекает CVV код из текста (только 3 цифры)
 
         Args:
             text: текст для парсинга
             card_number: номер карты (для исключения из поиска)
 
         Returns:
-            CVV код или None
+            CVV код (3 цифры) или None
         """
         # Удаляем номер карты из текста, если он есть
         if card_number:
-            text = text.replace(card_number.replace(' ', ''), '')
+            clean_number = card_number.replace(' ', '')
+            text = text.replace(clean_number, '')
+            # Удаляем также по частям (по 4 цифры)
+            for i in range(0, len(clean_number), 4):
+                text = text.replace(clean_number[i:i+4], '')
 
-        # Ищем 3-4 цифры
+        # Удаляем срок действия из текста, если он есть
+        # Ищем паттерны типа 12/25, 01/26 и т.д.
+        text = re.sub(r'\b(0[1-9]|1[0-2])[/\-\s]?\d{2}\b', '', text)
+
+        # Ищем только 3 цифры
         matches = re.findall(CardParser.CVV_PATTERN, text)
 
-        # Фильтруем: CVV это 3 или 4 цифры, но не часть номера карты
+        # Возвращаем первое найденное 3-значное число
         for match in matches:
-            if len(match) == 3 or len(match) == 4:
-                # Проверяем что это не часть даты
-                if not re.search(rf'\d{{2}}[/\-\s]?{match}', text):
-                    return match
+            if len(match) == 3:
+                # Дополнительная проверка: это не часть большего числа
+                # и это действительно отдельно стоящее число
+                return match
 
         return None
 
