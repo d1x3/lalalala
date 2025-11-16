@@ -31,9 +31,9 @@ jobs:
 
     - name: Run flight search
       env:
-  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-  AVIASALES_API_TOKEN: ${{ secrets.AVIASALES_API_TOKEN }}
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        AVIASALES_API_TOKEN: ${{ secrets.AVIASALES_API_TOKEN }}
       run: |
         # Обновляем flight_config.py с токенами из secrets
         if [ ! -z "$TELEGRAM_BOT_TOKEN" ]; then
@@ -43,7 +43,7 @@ jobs:
           sed -i "s/TELEGRAM_CHAT_ID = .*/TELEGRAM_CHAT_ID = \"$TELEGRAM_CHAT_ID\"/" flight_config.py
         fi
         if [ ! -z "$AVIASALES_API_TOKEN" ]; then
-        sed -i "s/AVIASALES_API_TOKEN = .*/AVIASALES_API_TOKEN = \"$AVIASALES_API_TOKEN\"/" flight_config.py
+          sed -i "s/AVIASALES_API_TOKEN = .*/AVIASALES_API_TOKEN = \"$AVIASALES_API_TOKEN\"/" flight_config.py
         fi
 
         # Запускаем бота в режиме однократного поиска
@@ -56,6 +56,7 @@ jobs:
         name: flight-bot-logs
         path: cheap_flights_bot.log
         retention-days: 7
+        if-no-files-found: ignore
 
     - name: Save found flights history
       if: always()
@@ -64,3 +65,4 @@ jobs:
         name: found-flights
         path: found_flights.json
         retention-days: 30
+        if-no-files-found: ignore
