@@ -252,21 +252,43 @@ def format_flight_message(flight: Dict) -> str:
     airline = flight.get('airline', 'Unknown')
     transfers = flight.get('transfers', 0)
 
-    # Форматируем дату
+    # Форматируем дату для отображения и для ссылки
+    formatted_date = 'Дата не указана'
+    url_date = ''
+
     try:
-        if 'T' in date:
-            dt = datetime.fromisoformat(date.replace('Z', '+00:00'))
-            formatted_date = dt.strftime('%d.%m.%Y %H:%M')
-        else:
-            dt = datetime.strptime(date, '%Y-%m-%d')
-            formatted_date = dt.strftime('%d.%m.%Y')
-    except:
-        formatted_date = date
+        if date:
+            # Парсим дату
+            if 'T' in date:
+                dt = datetime.fromisoformat(date.replace('Z', '+00:00'))
+                formatted_date = dt.strftime('%d.%m.%Y %H:%M')
+                url_date = dt.strftime('%d%m')  # Формат DDMM для ссылки
+            else:
+                dt = datetime.strptime(date, '%Y-%m-%d')
+                formatted_date = dt.strftime('%d.%m.%Y')
+                url_date = dt.strftime('%d%m')  # Формат DDMM для ссылки
+    except Exception as e:
+        logger.warning(f"Ошибка парсинга даты '{date}': {e}")
+        # Пробуем извлечь дату из строки
+        if date and len(date) >= 10:
+            formatted_date = date[:10]
+            try:
+                # Попытка создать url_date из YYYY-MM-DD
+                parts = date.split('-')
+                if len(parts) >= 3:
+                    url_date = f"{parts[2][:2]}{parts[1]}"  # DDMM
+            except:
+                pass
 
     # Формируем ссылку для поиска
     search_url = flight.get('link') or flight.get('search_url')
     if not search_url:
-        search_url = f"https://www.aviasales.ru/search/{origin}{date.split('T')[0]}{destination}1"
+        if url_date:
+            # Формат: https://www.aviasales.ru/search/MOW2612UFA1
+            search_url = f"https://www.aviasales.ru/search/{origin}{url_date}{destination}1"
+        else:
+            # Если даты нет, ссылка на общий поиск
+            search_url = f"https://www.aviasales.ru/search/{origin}{destination}"
 
     message = f"✈️ Дешевый билет найден!\n\n"
     message += f"📍 Маршрут: {origin} → {destination}\n"
