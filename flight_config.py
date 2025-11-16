@@ -12,7 +12,7 @@ AVIASALES_API_TOKEN = "d466c02eb95b443bda5583c851f210ce"
 # Настройки поиска билетов
 ORIGIN_CITY = "MOW"  # Москва (код IATA)
 DESTINATION_CITY = "UFA"  # Уфа (код IATA)
-MAX_PRICE = 20000  # Максимальная цена билета в рублях
+MAX_PRICE = 10000  # Максимальная цена билета в рублях
 
 # Даты вылета
 DEPARTURE_DATES = [
@@ -37,7 +37,7 @@ DEPARTURE_DATES = [
 ]
 
 # Интервал проверки (в секундах)
-CHECK_INTERVAL = 3600  # Проверять каждый час
+CHECK_INTERVAL = 1800  # Проверять каждые 30 минут
 
 # Файл для хранения найденных билетов (чтобы не отправлять дубликаты)
 FOUND_FLIGHTS_FILE = "found_flights.json"
