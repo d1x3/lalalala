@@ -139,18 +139,36 @@ class FlightFinder:
     def _parse_aviasales_flight(self, flight_data: Dict) -> Optional[Dict]:
         """Парсинг данных о рейсе от Aviasales"""
         try:
+            # Цена может быть в полях value или price
             price = flight_data.get('value') or flight_data.get('price', 0)
+
+            # Дата отправления может быть в разных полях
+            departure_date = (
+                flight_data.get('departure_at') or
+                flight_data.get('depart_date') or
+                flight_data.get('departure_date') or
+                ''
+            )
+
+            # Количество пересадок
+            transfers = (
+                flight_data.get('number_of_changes') if flight_data.get('number_of_changes') is not None
+                else flight_data.get('transfers', 0)
+            )
+
+            # Авиакомпания (может отсутствовать, используем gate как запасной вариант)
+            airline = flight_data.get('airline') or flight_data.get('gate', 'Неизвестно')
 
             flight = {
                 'origin': flight_data.get('origin', config.ORIGIN_CITY),
                 'destination': flight_data.get('destination', config.DESTINATION_CITY),
-                'departure_date': flight_data.get('departure_at', ''),
-                'return_date': flight_data.get('return_at'),
+                'departure_date': departure_date,
+                'return_date': flight_data.get('return_at') or flight_data.get('return_date', ''),
                 'price': price,
                 'currency': 'RUB',
-                'airline': flight_data.get('airline', 'Unknown'),
+                'airline': airline,
                 'flight_number': flight_data.get('flight_number', ''),
-                'transfers': flight_data.get('transfers', 0),
+                'transfers': transfers,
                 'link': flight_data.get('link', ''),
                 'found_at': datetime.now().isoformat()
             }
@@ -158,6 +176,7 @@ class FlightFinder:
             return flight
         except Exception as e:
             logger.error(f"Ошибка парсинга рейса: {e}")
+            logger.error(f"Данные рейса: {flight_data}")
             return None
 
     def filter_by_price(self, flights: List[Dict], max_price: float) -> List[Dict]:
