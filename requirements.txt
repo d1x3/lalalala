@@ -90,3 +90,20 @@ wheel==0.37.1
 yake==0.4.8
 yarl==1.8.1
 zipp==3.10.0
+
+# Screen Automation Dependencies
+pyautogui==0.9.54
+opencv-python==4.8.*
+pillow==10.0.*
+pynput==1.7.6
+
+# Browser Automation
+selenium==4.15.*
+playwright==1.40.*
+undetected-chromedriver==3.5.*
+
+# Data Management
+pyyaml==6.0.*
+
+# SMS/Email Services (optional APIs)
+# Добавьте конкретные библиотеки для вашего SMS провайдера

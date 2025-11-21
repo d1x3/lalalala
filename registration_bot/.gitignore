@@ -1,0 +1,68 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Конфигурация и секреты
+config.yaml
+*.key
+*.pem
+
+# Данные
+accounts.json
+accounts.csv
+accounts.yaml
+*.log
+
+# Скриншоты и результаты
+*.png
+*.jpg
+*.jpeg
+screenshots/
+results/
+
+# Шаблоны (раскомментируйте если не хотите коммитить)
+# templates/
+
+# Временные файлы
+*.tmp
+*.bak
+temp/
+tmp/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Chrome/Selenium
+chromedriver
+geckodriver
